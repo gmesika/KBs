@@ -1,2 +1,12 @@
 KB how to create a MAIN branch with different name then MASTER:
 
+1. create a new repo without any file or branches
+2. clone that repo to your local
+3. change directory to the newly cloned repository
+4. create a new file: readme.txt
+5. git add readme.txt
+6. git commit -m "first file"
+7. git branch -m master different-master-branch-name
+8. git push origin different-master-branch-name
+
+notice that the new branch created is MAIN and has the name you specificed (different-master-branch-name)
