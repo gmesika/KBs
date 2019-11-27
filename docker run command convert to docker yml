@@ -10,17 +10,22 @@ import java.util.regex.Pattern;
 public class Convert {
 
 	private static boolean tty = false;
+	private static boolean privileged = false;
 	private static List<String> ports = null;
 	private static List<String> volumes = null;
+	private static List<String> envFiles = null;
 	private static List<String> envVars = null;
 	private static List<String> exposedPorts = null;
+	private static List<String> depends_on = null;
 	private static String name = null;
 	private static String user = null;
 	private static String imageName = null;
 	private static String runArgs = null;
-
+	private static String workdir = null;
+	
 
 	private static StringBuffer yml_file = null;
+	private static StringBuffer docker_run = null;
 
 	private static boolean check_constraint_of_arg_by_position(int pos, String arg)
 	{
@@ -38,7 +43,7 @@ public class Convert {
 
 	private static boolean matchesPossibleImageName(String possibleImageName)
 	{
-		Pattern p4 = Pattern.compile("[0-9a-z].*");
+		Pattern p4 = Pattern.compile(".*");
 		Matcher m4 = p4.matcher(possibleImageName);
 		boolean b4 = m4.matches();
 		return b4;
@@ -58,14 +63,23 @@ public class Convert {
 		case "--tty":
 			tty = true;
 			return false;
+		case "--privileged":
+			privileged = true;
+			return false;			
 		case "-p":
 		case "--publish":
 			ports = (ports == null) ? new ArrayList<String>() : ports;
 			return true ;
+		case "--depends_on":
+			depends_on = (depends_on == null) ? new ArrayList<String>() : depends_on;
+			return true;
 		case "-v":
 		case "--volume":
 			volumes = (volumes == null) ? new ArrayList<String>() : volumes;
 			return true;		
+		case "--env-file":
+			envFiles = (envFiles == null) ? new ArrayList<String>() : envFiles;
+			return true;	
 		case "-e" :
 		case "--env":
 			envVars = (envVars == null) ? new ArrayList<String>() : envVars;
@@ -80,19 +94,24 @@ public class Convert {
 		case "--name":
 			name = "";
 			return true;	
+		case "--workdir":
+			workdir = "";
+			return true;
 		default:
 			if (imageName == null && matchesPossibleImageName(objName))
 			{
 				imageName = objName;
-				return true;
+				return false;
 			}
 			else
 			{
 				if (imageName != null)
 				{
-					if (runArgs == null)
-						runArgs = "";
-					return true;					
+					if (runArgs == null) 
+						runArgs = objName;
+					else
+						runArgs = runArgs.concat(" ").concat(objName);
+					return false;					
 				}
 				else
 				{
@@ -116,6 +135,19 @@ public class Convert {
 		case "--tty":
 			tty = true;
 			return true;
+		case "--workdir":
+			workdir = val;
+			return true;
+		case "--privileged":
+			privileged = true;
+			return true;			
+		case "--depends_on":
+			Pattern p7 = Pattern.compile(".*");
+			Matcher m7 = p7.matcher(val);
+			boolean b7 = m7.matches();
+			if (b7)
+				depends_on.add(val);
+			return b7;
 		case "-p":
 		case "--publish":
 			Pattern p = Pattern.compile("^[0-9].*:[0-9].*$");
@@ -131,8 +163,15 @@ public class Convert {
 			boolean b1 = m1.matches();
 			if (b1)
 				volumes.add(val);
-			return b1 ;		
-		case "-e" :
+			return b1 ;	
+		case "--env-file":
+			Pattern p6 = Pattern.compile(".*");
+			Matcher m6 = p6.matcher(val);
+			boolean b6 = m6.matches();
+			if (b6)
+				envVars.add(val);
+			return b6;
+		case "-e":
 		case "--env":
 			Pattern p2 = Pattern.compile(".*=.*");
 			Matcher m2 = p2.matcher(val);
@@ -163,7 +202,13 @@ public class Convert {
 				user = val;
 			return b5;
 		default:
-			return true;
+			if (runArgs != null)
+			{
+				runArgs.concat(" ").concat(val);
+				return true;
+			}
+			else
+				return false;
 		}
 
 	}
@@ -285,19 +330,32 @@ public class Convert {
 			yml_file.append("services:\r");
 			break;
 		case "service_name":
+			docker_run.append(" ");docker_run.append("--hostname");docker_run.append(" ");docker_run.append(name);docker_run.append(" ");
 			yml_file.append(" ");yml_file.append(name);yml_file.append(":");yml_file.append("\r\n");
 			break;
 		case "container_name":
+			docker_run.append(" ");docker_run.append("--name");docker_run.append(" ");docker_run.append(name);docker_run.append(" ");
 			yml_file.append(" ");yml_file.append(" ");yml_file.append("container_name:");yml_file.append(" ");yml_file.append(name);yml_file.append("\r\n");
 			break;
 		case "image_name":
+			docker_run.append(" ");docker_run.append(imageName);docker_run.append(" ");
 			yml_file.append(" ");yml_file.append(" ");yml_file.append("image:");yml_file.append(" ");yml_file.append(imageName);yml_file.append("\r\n");
+			break;
+		case "env-file":
+			if (envFiles == null) break;
+			yml_file.append(" ");yml_file.append(" ");yml_file.append("env_file:");yml_file.append("\r\n");
+			for (String envFile : envFiles)
+			{
+				docker_run.append(" ");docker_run.append("--env-file");docker_run.append(" ");docker_run.append(envFile);docker_run.append(" ");
+				yml_file.append(" ");yml_file.append(" ");yml_file.append(" ");yml_file.append("-");yml_file.append(" ");yml_file.append(envFile);yml_file.append("\r\n");					
+			}
 			break;
 		case "env":
 			if (envVars == null) break;
 			yml_file.append(" ");yml_file.append(" ");yml_file.append("environment:");yml_file.append("\r\n");
 			for (String envVar : envVars)
 			{
+				docker_run.append(" ");docker_run.append("-e");docker_run.append(" ");docker_run.append(envVar);docker_run.append(" ");
 				yml_file.append(" ");yml_file.append(" ");yml_file.append(" ");yml_file.append("-");yml_file.append(" ");yml_file.append(envVar);yml_file.append("\r\n");					
 			}
 			break;
@@ -306,6 +364,7 @@ public class Convert {
 			yml_file.append(" ");yml_file.append(" ");yml_file.append("volumes:");yml_file.append("\r\n");
 			for (String volume : volumes)
 			{
+				docker_run.append(" ");docker_run.append("-v");docker_run.append(" ");docker_run.append(volume);docker_run.append(" ");
 				yml_file.append(" ");yml_file.append(" ");yml_file.append(" ");yml_file.append("-");yml_file.append(" ");yml_file.append(volume);yml_file.append("\r\n");					
 			}
 			break;
@@ -314,27 +373,60 @@ public class Convert {
 			yml_file.append(" ");yml_file.append(" ");yml_file.append("ports:");yml_file.append("\r\n");
 			for (String port : ports)
 			{
+				docker_run.append(" ");docker_run.append("-p");docker_run.append(" ");docker_run.append(port);docker_run.append(" ");
 				yml_file.append(" ");yml_file.append(" ");yml_file.append(" ");yml_file.append("-");yml_file.append(" ");yml_file.append(port);yml_file.append("\r\n");					
 			}
 			break;
+		case "depends_on":
+			if (depends_on == null) break;
+			yml_file.append(" ");yml_file.append(" ");yml_file.append("depends_on:");yml_file.append("\r\n");
+			for (String depend_on : depends_on)
+			{
+				yml_file.append(" ");yml_file.append(" ");yml_file.append(" ");yml_file.append("-");yml_file.append(" ");yml_file.append(depend_on);yml_file.append("\r\n");					
+			}
+			break;	
 		case "expose":
 			if (exposedPorts == null ) break;
 			yml_file.append(" ");yml_file.append(" ");yml_file.append("expose:");yml_file.append("\r\n");
 			for (String exposedPort : exposedPorts)
 			{
+				docker_run.append(" ");docker_run.append("--expose");docker_run.append(" ");docker_run.append(exposedPort);docker_run.append(" ");
 				yml_file.append(" ");yml_file.append(" ");yml_file.append(" ");yml_file.append("-");yml_file.append(" ");yml_file.append(exposedPort);yml_file.append("\r\n");					
 			}
 			break;
 		case "user":
 			if (user != null)
 			{
+				docker_run.append(" ");docker_run.append("-u");docker_run.append(" ");docker_run.append(user);docker_run.append(" ");
 				yml_file.append(" ");yml_file.append(" ");yml_file.append("user:");yml_file.append(user);yml_file.append("\r\n");
 			}
 			break;
 		case "tty":
 			if (tty)
 			{
+				docker_run.append(" ");docker_run.append("--tty");docker_run.append(" ");
 				yml_file.append(" ");yml_file.append(" ");yml_file.append("tty:");yml_file.append(" ");yml_file.append(tty);yml_file.append("\r\n");
+			}
+			break;
+		case "privileged":
+			if (privileged)
+			{
+				docker_run.append(" ");docker_run.append("--privileged");
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("privileged:");yml_file.append(" ");yml_file.append(privileged);yml_file.append("\r\n");
+			}
+			break;	
+		case "workdir":
+			if (workdir != null)
+			{
+				docker_run.append(" ");docker_run.append("--workdir");docker_run.append(" ");docker_run.append(workdir);docker_run.append(" ");
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("working_dir:");yml_file.append(" ");yml_file.append(workdir);yml_file.append("\r\n");
+			}
+			break;
+		case "runArgs":
+			if (runArgs != null)
+			{				
+				docker_run.append(" ");docker_run.append(runArgs);
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("command:");yml_file.append(" ");yml_file.append("'");yml_file.append(runArgs);yml_file.append("'");yml_file.append("\r\n");
 			}
 			break;
 		}
@@ -343,18 +435,31 @@ public class Convert {
 	private static void createYML()
 	{		
 		yml_file  = new StringBuffer();
-		
-		//writeToYMLFile("version");
-		//writeToYMLFile("services");
-		writeToYMLFile("service_name");
-		writeToYMLFile("container_name");
-		writeToYMLFile("image_name");
-		writeToYMLFile("env");
-		writeToYMLFile("volumes");
-		writeToYMLFile("ports");
-		writeToYMLFile("expose");
-		writeToYMLFile("user");
-		writeToYMLFile("tty");
+		docker_run = new StringBuffer();		
+		try
+		{
+			//writeToYMLFile("version");
+			//writeToYMLFile("services");
+			writeToYMLFile("service_name");
+			writeToYMLFile("container_name");
+			
+			writeToYMLFile("env-file");
+			writeToYMLFile("env");
+			writeToYMLFile("volumes");
+			writeToYMLFile("ports");
+			writeToYMLFile("expose");
+			writeToYMLFile("user");
+			writeToYMLFile("tty");
+			writeToYMLFile("privileged");
+			writeToYMLFile("workdir");
+			writeToYMLFile("depends_on");
+		}
+		finally
+		{
+			writeToYMLFile("image_name");
+			writeToYMLFile("runArgs");
+		}
+						
 	}
 
 	private static void writeYML() throws IOException
@@ -362,9 +467,17 @@ public class Convert {
 		System.out.println(yml_file.toString());		
 		FileWriter fw = new FileWriter("docker-compose.yml");
 		fw.write(yml_file.toString());
-		fw.close();	
+		fw.close();	// TODO add try-with-Resources catch exception
 	}
 
+	private static void writeDockerRun() throws IOException
+	{		
+		System.out.println(docker_run.toString());		
+		FileWriter fw = new FileWriter("docker-run.txt");
+		fw.write(docker_run.toString());
+		fw.close();	// TODO add try-with-Resources catch exception
+	}
+	
 	public static void main(String[] args) throws Exception 
 	{
 
@@ -372,6 +485,7 @@ public class Convert {
 		extractDockerObjects(sentence);
 		createYML();		
 		writeYML();
+		writeDockerRun();
 	}
 
 
