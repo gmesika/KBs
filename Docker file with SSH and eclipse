@@ -1,0 +1,30 @@
+FROM ubuntu
+
+USER root
+
+RUN apt-get update && apt-get install -y openssh-server xauth gedit
+RUN mkdir /var/run/sshd
+RUN echo 'root:root' | chpasswd
+RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+RUN sed -i 's/#PermitRootLogin yes/PermitRootLogin yes/' /etc/ssh/sshd_config
+
+RUN sed -i 's/#X11DisplayOffset 10/X11DisplayOffset 10/' /etc/ssh/sshd_config
+RUN sed -i 's/#X11UseLocalhost yes/X11UseLocalhost no/' /etc/ssh/sshd_config
+
+# SSH login fix. Otherwise user is kicked off after login
+RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+
+ENV NOTVISIBLE "in users profile"
+RUN echo "export VISIBLE=now" >> /etc/profile
+
+EXPOSE 22
+
+RUN apt-get update && apt-get install -y eclipse
+
+RUN wget -q -O /eclipse_linux.tar.gz "http://ftp.fau.de/eclipse/technology/epp/downloads/release/2019-09/R/eclipse-jee-2019-09-R-linux-gtk-x86_64.tar.gz"
+WORKDIR /
+RUN tar -xf /eclipse_linux.tar.gz
+
+#CMD ["/usr/sbin/sshd", "-D"]
+
+#ENTRYPOINT ["/usr/sbin/sshd", "-D"]
