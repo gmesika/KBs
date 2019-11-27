@@ -1,0 +1,379 @@
+package docker_run_2_compose_yml;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class Convert {
+
+	private static boolean tty = false;
+	private static List<String> ports = null;
+	private static List<String> volumes = null;
+	private static List<String> envVars = null;
+	private static List<String> exposedPorts = null;
+	private static String name = null;
+	private static String user = null;
+	private static String imageName = null;
+	private static String runArgs = null;
+
+
+	private static StringBuffer yml_file = null;
+
+	private static boolean check_constraint_of_arg_by_position(int pos, String arg)
+	{
+		switch (pos)
+		{
+		case 0:
+			return arg.equalsIgnoreCase("docker");
+		case 1:
+			return arg.equalsIgnoreCase("run");
+		default:
+			return true;
+		}
+
+	}
+
+	private static boolean matchesPossibleImageName(String possibleImageName)
+	{
+		Pattern p4 = Pattern.compile("[0-9a-z].*");
+		Matcher m4 = p4.matcher(possibleImageName);
+		boolean b4 = m4.matches();
+		return b4;
+	}
+	
+	private static boolean assign_object(String objName) throws Exception
+	{
+		System.out.println(objName);
+		switch (objName.toLowerCase())
+		{
+		case "docker":
+			return false ;
+		case "run":
+			return false;
+		case "-d":
+			return false ;
+		case "--tty":
+			tty = true;
+			return false;
+		case "-p":
+		case "--publish":
+			ports = (ports == null) ? new ArrayList<String>() : ports;
+			return true ;
+		case "-v":
+		case "--volume":
+			volumes = (volumes == null) ? new ArrayList<String>() : volumes;
+			return true;		
+		case "-e" :
+		case "--env":
+			envVars = (envVars == null) ? new ArrayList<String>() : envVars;
+			return true ;
+		case "-u" :
+		case "--user":
+			user = "";
+			return true ;	
+		case "--expose":
+			exposedPorts = (exposedPorts == null) ? new ArrayList<String>() : exposedPorts;
+			return true;	
+		case "--name":
+			name = "";
+			return true;	
+		default:
+			if (imageName == null && matchesPossibleImageName(objName))
+			{
+				imageName = objName;
+				return true;
+			}
+			else
+			{
+				if (imageName != null)
+				{
+					if (runArgs == null)
+						runArgs = "";
+					return true;					
+				}
+				else
+				{
+					throw new Exception("wrong docker run syntax command!");
+				}
+			}	
+		}
+
+	}
+
+	private static boolean assign_value(String obj, String val)
+	{
+		switch (obj)
+		{
+		case "docker":
+			return true;
+		case "run":
+			return true;
+		case "-d":
+			return true;
+		case "--tty":
+			tty = true;
+			return true;
+		case "-p":
+		case "--publish":
+			Pattern p = Pattern.compile("^[0-9].*:[0-9].*$");
+			Matcher m = p.matcher(val);
+			boolean b = m.matches();
+			if (b)
+				ports.add(val);
+			return b;
+		case "-v":
+		case "--volume":
+			Pattern p1 = Pattern.compile(".*:.*");
+			Matcher m1 = p1.matcher(val);
+			boolean b1 = m1.matches();
+			if (b1)
+				volumes.add(val);
+			return b1 ;		
+		case "-e" :
+		case "--env":
+			Pattern p2 = Pattern.compile(".*=.*");
+			Matcher m2 = p2.matcher(val);
+			boolean b2 = m2.matches();
+			if (b2)
+				envVars.add(val);
+			return b2;	
+		case "--expose":
+			Pattern p3 = Pattern.compile("^[0-9]*");
+			Matcher m3 = p3.matcher(val);
+			boolean b3 = m3.matches();
+			if (b3)
+				exposedPorts.add(val);
+			return b3;	
+		case "--name":
+			Pattern p4 = Pattern.compile("[\\w][\\w.-]{0,127}");
+			Matcher m4 = p4.matcher(val);
+			boolean b4 = m4.matches();
+			if (b4)
+				name = val;
+			return b4;		
+		case "-u" :
+		case "--user":
+			Pattern p5 = Pattern.compile(".*");
+			Matcher m5 = p5.matcher(val);
+			boolean b5 = m5.matches();
+			if (b5)
+				user = val;
+			return b5;
+		default:
+			return true;
+		}
+
+	}
+
+	private static String organizeDockerRun(String[] args)
+	{
+
+		boolean newWord = true;
+		String word = null;
+		boolean switchIndicator = true;
+
+		String sentence = "";
+		StringBuilder stringBuilder = new StringBuilder();
+		for (int i = 0; i < args.length; i++) {
+			stringBuilder.append(args[i] + " ");
+		}
+		String argsString = stringBuilder.toString();
+		for (int counter = 0 ; counter < argsString.toCharArray().length; counter++)
+		{
+			char singleChar  = argsString.charAt(counter);
+			switch (singleChar)
+			{
+			case ' ':					
+				if (! newWord && word != null && word.length() > 0)
+				{
+					sentence = sentence + word + ' ';
+				}
+				newWord = true;
+				switchIndicator = false;
+				break;
+			case '-':
+				if (newWord || word == null || word.length() == 0)
+				{						
+					newWord = false;
+					word = "";
+					switchIndicator = true;
+				}
+				word = word + String.valueOf(singleChar);
+				break;
+			case '=':
+				if (switchIndicator)
+				{
+					if (! newWord && word != null && word.length() > 0)
+					{
+						sentence = sentence + word + ' ';
+					}
+					newWord = true;						
+				}
+				else
+				{
+					word = word + String.valueOf(singleChar);
+				}
+				switchIndicator = false;
+				break;
+			default:
+
+				if (newWord || word == null || word.length() == 0)
+				{
+					newWord = false;
+					word = "";						
+				}	
+				word = word + singleChar;
+			}
+
+		}
+		return sentence;
+	}
+
+	private static void extractDockerObjects(String sentence) throws Exception
+	{
+		boolean objectAssigned = false;
+		boolean valueAssigned = false;
+		String object = null;
+		boolean completed = false;
+
+		String[] sentence_args = sentence.split(" ");
+		for (int counter = 0 ; counter < sentence_args.length; counter++)
+		{
+			System.out.println("pos/arg: " + counter + " / " + sentence_args[counter] );
+			String docker_val = sentence_args[counter];
+			if (! check_constraint_of_arg_by_position(counter, docker_val)) {				
+				throw new Exception ("wrong docker run syntax command!");
+			}
+
+			if (objectAssigned)
+			{					
+				valueAssigned = assign_value(object, docker_val );
+				if (! valueAssigned)
+					throw new Exception ("wrong docker run syntax command!");
+				objectAssigned = false;
+			}
+			else
+			{
+				if (! objectAssigned)
+				{
+					objectAssigned = assign_object(docker_val);				
+					object = docker_val;
+				}			
+			}
+
+			if (counter + 1 == sentence_args.length && imageName != null)
+			{
+				completed = true;
+			}
+		}
+
+		if (! completed)
+			throw new Exception("wrong docker run syntax command!");
+	}
+
+	private static void writeToYMLFile(String objName)
+	{
+		switch (objName)
+		{
+		case "version":			
+			yml_file.append("version: '3.2'\r");		
+			break;
+		case "services":
+			yml_file.append("services:\r");
+			break;
+		case "service_name":
+			yml_file.append(" ");yml_file.append(name);yml_file.append(":");yml_file.append("\r\n");
+			break;
+		case "container_name":
+			yml_file.append(" ");yml_file.append(" ");yml_file.append("container_name:");yml_file.append(" ");yml_file.append(name);yml_file.append("\r\n");
+			break;
+		case "image_name":
+			yml_file.append(" ");yml_file.append(" ");yml_file.append("image:");yml_file.append(" ");yml_file.append(imageName);yml_file.append("\r\n");
+			break;
+		case "env":
+			if (envVars == null) break;
+			yml_file.append(" ");yml_file.append(" ");yml_file.append("environment:");yml_file.append("\r\n");
+			for (String envVar : envVars)
+			{
+				yml_file.append(" ");yml_file.append(" ");yml_file.append(" ");yml_file.append("-");yml_file.append(" ");yml_file.append(envVar);yml_file.append("\r\n");					
+			}
+			break;
+		case "volumes":
+			if (volumes == null) break;
+			yml_file.append(" ");yml_file.append(" ");yml_file.append("volumes:");yml_file.append("\r\n");
+			for (String volume : volumes)
+			{
+				yml_file.append(" ");yml_file.append(" ");yml_file.append(" ");yml_file.append("-");yml_file.append(" ");yml_file.append(volume);yml_file.append("\r\n");					
+			}
+			break;
+		case "ports":
+			if (ports == null) break;
+			yml_file.append(" ");yml_file.append(" ");yml_file.append("ports:");yml_file.append("\r\n");
+			for (String port : ports)
+			{
+				yml_file.append(" ");yml_file.append(" ");yml_file.append(" ");yml_file.append("-");yml_file.append(" ");yml_file.append(port);yml_file.append("\r\n");					
+			}
+			break;
+		case "expose":
+			if (exposedPorts == null ) break;
+			yml_file.append(" ");yml_file.append(" ");yml_file.append("expose:");yml_file.append("\r\n");
+			for (String exposedPort : exposedPorts)
+			{
+				yml_file.append(" ");yml_file.append(" ");yml_file.append(" ");yml_file.append("-");yml_file.append(" ");yml_file.append(exposedPort);yml_file.append("\r\n");					
+			}
+			break;
+		case "user":
+			if (user != null)
+			{
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("user:");yml_file.append(user);yml_file.append("\r\n");
+			}
+			break;
+		case "tty":
+			if (tty)
+			{
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("tty:");yml_file.append(" ");yml_file.append(tty);yml_file.append("\r\n");
+			}
+			break;
+		}
+	}
+
+	private static void createYML()
+	{		
+		yml_file  = new StringBuffer();
+		
+		//writeToYMLFile("version");
+		//writeToYMLFile("services");
+		writeToYMLFile("service_name");
+		writeToYMLFile("container_name");
+		writeToYMLFile("image_name");
+		writeToYMLFile("env");
+		writeToYMLFile("volumes");
+		writeToYMLFile("ports");
+		writeToYMLFile("expose");
+		writeToYMLFile("user");
+		writeToYMLFile("tty");
+	}
+
+	private static void writeYML() throws IOException
+	{		
+		System.out.println(yml_file.toString());		
+		FileWriter fw = new FileWriter("docker-compose.yml");
+		fw.write(yml_file.toString());
+		fw.close();	
+	}
+
+	public static void main(String[] args) throws Exception 
+	{
+
+		String sentence = organizeDockerRun(args);
+		extractDockerObjects(sentence);
+		createYML();		
+		writeYML();
+	}
+
+
+
+}
