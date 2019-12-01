@@ -1,14 +1,20 @@
 package docker_run_2_compose_yml;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Convert {
 
+	private static String ymlfile = null;
+	private static String runfile = null;
+	private static String[] dockerArgs = null;
 	private static boolean tty = false;
 	private static boolean privileged = false;
 	private static List<String> ports = null;
@@ -22,11 +28,13 @@ public class Convert {
 	private static String imageName = null;
 	private static String runArgs = null;
 	private static String workdir = null;
-	
+	private static boolean deamon = false;
 
 	private static StringBuffer yml_file = null;
 	private static StringBuffer docker_run = null;
 
+	private static boolean createYML = false;
+	
 	private static boolean check_constraint_of_arg_by_position(int pos, String arg)
 	{
 		switch (pos)
@@ -34,7 +42,17 @@ public class Convert {
 		case 0:
 			return arg.equalsIgnoreCase("docker");
 		case 1:
-			return arg.equalsIgnoreCase("run");
+			switch(arg)
+			{
+			case "run":
+				createYML = true;
+				return true;
+			case "exec":
+				createYML = false;
+				return true;				
+			default:
+				return false;
+			}			
 		default:
 			return true;
 		}
@@ -59,6 +77,7 @@ public class Convert {
 		case "run":
 			return false;
 		case "-d":
+			deamon = true;
 			return false ;
 		case "--tty":
 			tty = true;
@@ -131,6 +150,7 @@ public class Convert {
 		case "run":
 			return true;
 		case "-d":
+			deamon = true;
 			return true;
 		case "--tty":
 			tty = true;
@@ -169,7 +189,7 @@ public class Convert {
 			Matcher m6 = p6.matcher(val);
 			boolean b6 = m6.matches();
 			if (b6)
-				envVars.add(val);
+				envFiles.add(val);
 			return b6;
 		case "-e":
 		case "--env":
@@ -319,7 +339,7 @@ public class Convert {
 			throw new Exception("wrong docker run syntax command!");
 	}
 
-	private static void writeToYMLFile(String objName)
+	private static void writeRUNnYML(String objName)
 	{
 		switch (objName)
 		{
@@ -328,6 +348,12 @@ public class Convert {
 			break;
 		case "services":
 			yml_file.append("services:\r");
+			break;
+		case "deamon":
+			if (deamon)
+			{
+				docker_run.append(" ");docker_run.append("-d");
+			}
 			break;
 		case "service_name":
 			docker_run.append(" ");docker_run.append("--hostname");docker_run.append(" ");docker_run.append(name);docker_run.append(" ");
@@ -432,40 +458,43 @@ public class Convert {
 		}
 	}
 
-	private static void createYML()
+	private static void createRUNnYML()
 	{		
 		yml_file  = new StringBuffer();
 		docker_run = new StringBuffer();		
 		try
 		{
-			//writeToYMLFile("version");
-			//writeToYMLFile("services");
-			writeToYMLFile("service_name");
-			writeToYMLFile("container_name");
-			
-			writeToYMLFile("env-file");
-			writeToYMLFile("env");
-			writeToYMLFile("volumes");
-			writeToYMLFile("ports");
-			writeToYMLFile("expose");
-			writeToYMLFile("user");
-			writeToYMLFile("tty");
-			writeToYMLFile("privileged");
-			writeToYMLFile("workdir");
-			writeToYMLFile("depends_on");
+			//writeRUNnYML("version");
+			//writeRUNnYML("services");
+			writeRUNnYML("service_name");
+			writeRUNnYML("container_name");
+			writeRUNnYML("deamon");
+			writeRUNnYML("env-file");
+			writeRUNnYML("env");
+			writeRUNnYML("volumes");
+			writeRUNnYML("ports");
+			writeRUNnYML("expose");
+			writeRUNnYML("user");
+			writeRUNnYML("tty");
+			writeRUNnYML("privileged");
+			writeRUNnYML("workdir");
+			writeRUNnYML("depends_on");
 		}
 		finally
 		{
-			writeToYMLFile("image_name");
-			writeToYMLFile("runArgs");
+			// for docker run command capability, the following have to end the list
+			writeRUNnYML("image_name");
+			writeRUNnYML("runArgs");
 		}
 						
 	}
 
 	private static void writeYML() throws IOException
 	{		
+		if (! createYML) return;
+		
 		System.out.println(yml_file.toString());		
-		FileWriter fw = new FileWriter("docker-compose.yml");
+		FileWriter fw = new FileWriter(ymlfile);
 		fw.write(yml_file.toString());
 		fw.close();	// TODO add try-with-Resources catch exception
 	}
@@ -473,17 +502,58 @@ public class Convert {
 	private static void writeDockerRun() throws IOException
 	{		
 		System.out.println(docker_run.toString());		
-		FileWriter fw = new FileWriter("docker-run.txt");
-		fw.write(docker_run.toString());
+		FileWriter fw = new FileWriter(runfile);
+		fw.write("docker run " + docker_run.toString() + "\n");
 		fw.close();	// TODO add try-with-Resources catch exception
+	}
+	
+	private static void parseArgs(String[] args) throws IOException
+	{
+		for (int counter = 0; counter < args.length; counter++)
+		{
+			//--cmdline=docker_args.txt --ymlfile=docker_compose_output.yml --runfile=docker_run_output.txt
+			if (args[counter].startsWith("--"))
+			{
+				String switchStr = (String)args[counter];
+				String switchName = switchStr.split("--")[1].split("=")[0];//need to check that = exists
+				String switchValue = switchStr.split("--")[1].split("=")[1];//need to check that = exists
+				
+				switch (switchName)
+				{
+				case "cmdline":
+					String fileName = switchValue;
+					
+					BufferedReader reader = new BufferedReader(new FileReader(fileName));
+				    String currentLine = reader.readLine();
+				    reader.close();					
+					dockerArgs = currentLine.split(" ");
+					break;
+				case "ymlfile":
+					ymlfile = switchValue;
+					break;
+				case "runfile":
+					runfile = switchValue;
+					break;
+				default:
+					System.out.println("unknown switch val");
+					System.exit(1);		
+				}
+			}
+			else
+			{
+				System.out.println("switch has to start with --");
+				System.exit(1);
+			}
+				
+		}
 	}
 	
 	public static void main(String[] args) throws Exception 
 	{
-
-		String sentence = organizeDockerRun(args);
+		parseArgs(args);
+		String sentence = organizeDockerRun(dockerArgs);
 		extractDockerObjects(sentence);
-		createYML();		
+		createRUNnYML();		
 		writeYML();
 		writeDockerRun();
 	}
