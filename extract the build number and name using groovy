@@ -1,0 +1,12 @@
+extract the build number and name using groovy
+
+please the following in Groovy Script
+under Inject environment variables to the build process
+
+def jobName = Thread.currentThread().getCurrentExecutable().getProject().getDisplayName()
+def jobNumber = Thread.currentThread().getCurrentExecutable().getNumber()
+jobName = jobName.toLowerCase()
+def tag = ":" + jobName + "." + jobNumber 
+
+def map = ["BUILD_TAG": tag, "BUILD_NUM":jobNumber, "JOB_NAME":jobName]
+return map
