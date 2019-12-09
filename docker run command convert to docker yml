@@ -28,6 +28,7 @@ public class Convert {
 	private static String imageName = null;
 	private static String runArgs = null;
 	private static String workdir = null;
+	private static String network = null;
 	private static boolean deamon = false;
 
 	private static StringBuffer yml_file = null;
@@ -116,6 +117,9 @@ public class Convert {
 		case "--workdir":
 			workdir = "";
 			return true;
+		case "--network":
+			network = "";
+			return true;			
 		default:
 			if (imageName == null && matchesPossibleImageName(objName))
 			{
@@ -213,6 +217,13 @@ public class Convert {
 			if (b4)
 				name = val;
 			return b4;		
+		case "--network":
+			Pattern p8 = Pattern.compile("host|bridge");
+			Matcher m8 = p8.matcher(val);
+			boolean b8 = m8.matches();
+			if (b8)
+				network = val;
+			return b8;
 		case "-u" :
 		case "--user":
 			Pattern p5 = Pattern.compile(".*");
@@ -441,6 +452,13 @@ public class Convert {
 				yml_file.append(" ");yml_file.append(" ");yml_file.append("privileged:");yml_file.append(" ");yml_file.append(privileged);yml_file.append("\r\n");
 			}
 			break;	
+		case "network":
+			if (network != null)
+			{
+				docker_run.append(" ");docker_run.append("--network");docker_run.append(" ");docker_run.append(network);docker_run.append(" ");
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("network_mode:");yml_file.append(" \"");yml_file.append(network);yml_file.append("\"\r\n");
+			}
+			break;
 		case "workdir":
 			if (workdir != null)
 			{
@@ -477,6 +495,7 @@ public class Convert {
 			writeRUNnYML("user");
 			writeRUNnYML("tty");
 			writeRUNnYML("privileged");
+			writeRUNnYML("network");
 			writeRUNnYML("workdir");
 			writeRUNnYML("depends_on");
 		}
