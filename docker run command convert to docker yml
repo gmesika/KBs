@@ -29,6 +29,7 @@ public class Convert {
 	private static String runArgs = null;
 	private static String workdir = null;
 	private static String network = null;
+	private static String restart = null;
 	private static boolean deamon = false;
 
 	private static StringBuffer yml_file = null;
@@ -107,7 +108,10 @@ public class Convert {
 		case "-u" :
 		case "--user":
 			user = "";
-			return true ;	
+			return true ;
+		case "--restart":
+			restart = "";
+			return true;
 		case "--expose":
 			exposedPorts = (exposedPorts == null) ? new ArrayList<String>() : exposedPorts;
 			return true;	
@@ -224,6 +228,13 @@ public class Convert {
 			if (b8)
 				network = val;
 			return b8;
+		case "--restart":
+			Pattern p9 = Pattern.compile("no|always|unless-stopped|on-failure|on-failure:[0-9.*]");
+			Matcher m9 = p9.matcher(val);
+			boolean b9 = m9.matches();
+			if (b9)
+				network = val;
+			return b9;
 		case "-u" :
 		case "--user":
 			Pattern p5 = Pattern.compile(".*");
@@ -459,6 +470,12 @@ public class Convert {
 				yml_file.append(" ");yml_file.append(" ");yml_file.append("network_mode:");yml_file.append(" \"");yml_file.append(network);yml_file.append("\"\r\n");
 			}
 			break;
+		case "restart":
+			if (restart != null)
+			{
+				docker_run.append(" ");docker_run.append("--restart");docker_run.append(" ");docker_run.append(restart);docker_run.append(" ");
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("restart:");yml_file.append(" ");yml_file.append(restart);yml_file.append("\r\n");
+			}
 		case "workdir":
 			if (workdir != null)
 			{
@@ -495,6 +512,7 @@ public class Convert {
 			writeRUNnYML("user");
 			writeRUNnYML("tty");
 			writeRUNnYML("privileged");
+			writeRUNnYML("restart");
 			writeRUNnYML("network");
 			writeRUNnYML("workdir");
 			writeRUNnYML("depends_on");
