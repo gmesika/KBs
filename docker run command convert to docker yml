@@ -233,7 +233,7 @@ public class Convert {
 			Matcher m9 = p9.matcher(val);
 			boolean b9 = m9.matches();
 			if (b9)
-				network = val;
+				restart = val;
 			return b9;
 		case "-u" :
 		case "--user":
