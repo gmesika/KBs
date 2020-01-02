@@ -1,0 +1,9 @@
+import java.text.SimpleDateFormat
+def date = new Date()
+
+sdf = new SimpleDateFormat("yyyy-MM-dd-HH-mm")
+println sdf.format(date)
+def tag_date = "1000-" + sdf.format(date)
+
+def map = ["TAG_DATE": tag_date]
+return map
