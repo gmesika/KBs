@@ -1,0 +1,24 @@
+import groovy.util.XmlSlurper
+import java.util.Map
+import jenkins.*
+import jenkins.model.*
+import hudson.*
+import hudson.model.*    
+
+def jenkins = Jenkins.instance
+//get job Item
+def item = jenkins.getItemByFullName("GSI-Device-Infra-Dev-Diag")
+//noContextIndex = item.getBuildByNumber(14).getLog().indexOf("could not open ctx")
+noContextIndex = item.getLastBuild().getLog().indexOf("could not open ctx")
+println(noContextIndex)
+if (noContextIndex > 0)
+{
+   println("\n\nAPU context is busy! check if any running program not releasing it\n\n")
+   build.result = hudson.model.Result.fromString('UNSTABLE')
+}
+testFailed = item.getLastBuild().getLog().indexOf("Test Result FAIL")
+if (testFailed > 0)
+{
+   println("\n\nDev Diag failed!\n\n")
+   build.result = hudson.model.Result.fromString('UNSTABLE')
+}
