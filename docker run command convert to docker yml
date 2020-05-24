@@ -210,7 +210,9 @@ public class Convert {
 			return b6;
 		case "-e":
 		case "--env":
-			Pattern p2 = Pattern.compile(".*=.*");
+			// ".*=.*" 	for --something="X=1"
+			// ".*"		for --env="DISPLAY"
+			Pattern p2 = Pattern.compile(".*");
 			Matcher m2 = p2.matcher(val);
 			boolean b2 = m2.matches();
 			if (b2)
