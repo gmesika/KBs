@@ -31,7 +31,9 @@ public class Convert {
 	private static String network = null;
 	private static String restart = null;
 	private static boolean deamon = false;
-
+	private static String hostname = null;
+	private static String entrypoint = null;
+	
 	private static StringBuffer yml_file = null;
 	private static StringBuffer docker_run = null;
 
@@ -123,9 +125,16 @@ public class Convert {
 			return true;
 		case "--network":
 			network = "";
-			return true;			
+			return true;	
+		case "--hostname":
+			hostname = "";
+			return true;	
+		case "--entrypoint":
+			entrypoint = "";
+			return true;
 		default:
-			if (imageName == null && matchesPossibleImageName(objName))
+			System.out.println("handling default");
+			if (! objName.startsWith("-") && imageName == null && matchesPossibleImageName(objName))
 			{
 				imageName = objName;
 				return false;
@@ -243,6 +252,21 @@ public class Convert {
 			if (b5)
 				user = val;
 			return b5;
+		case "-h":
+		case "--hostname":
+			Pattern p10 = Pattern.compile(".*");
+			Matcher m10 = p10.matcher(val);
+			boolean b10 = m10.matches();
+			if (b10)
+				hostname = val;
+			return b10;
+		case "--entrypoint":
+			Pattern p11 = Pattern.compile(".*");
+			Matcher m11 = p11.matcher(val);
+			boolean b11 = m11.matches();
+			if (b11)
+				entrypoint = val;
+			return b11;
 		default:
 			if (runArgs != null)
 			{
@@ -378,7 +402,7 @@ public class Convert {
 			}
 			break;
 		case "service_name":
-			docker_run.append(" ");docker_run.append("--hostname");docker_run.append(" ");docker_run.append(name);docker_run.append(" ");
+			//docker_run.append(" ");docker_run.append("--hostname");docker_run.append(" ");docker_run.append(name);docker_run.append(" ");
 			yml_file.append(" ");yml_file.append(name);yml_file.append(":");yml_file.append("\r\n");
 			break;
 		case "container_name":
@@ -490,6 +514,13 @@ public class Convert {
 				yml_file.append(" ");yml_file.append(" ");yml_file.append("command:");yml_file.append(" ");yml_file.append("'");yml_file.append(runArgs);yml_file.append("'");yml_file.append("\r\n");
 			}
 			break;
+		case "hostname":
+			if (hostname != null)
+			{
+				docker_run.append(" ");docker_run.append("--hostname");docker_run.append(" ");docker_run.append(hostname);docker_run.append(" ");
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("hostname:");yml_file.append(hostname);yml_file.append("\r\n");
+			}
+			break;
 		}
 	}
 
@@ -516,6 +547,7 @@ public class Convert {
 			writeRUNnYML("network");
 			writeRUNnYML("workdir");
 			writeRUNnYML("depends_on");
+			writeRUNnYML("hostname");			
 		}
 		finally
 		{
@@ -587,6 +619,7 @@ public class Convert {
 	
 	public static void main(String[] args) throws Exception 
 	{
+		System.out.println("version 0.9");
 		parseArgs(args);
 		String sentence = organizeDockerRun(dockerArgs);
 		extractDockerObjects(sentence);
