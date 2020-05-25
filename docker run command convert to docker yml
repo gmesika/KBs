@@ -475,6 +475,13 @@ public class Convert {
 				yml_file.append(" ");yml_file.append(" ");yml_file.append("user:");yml_file.append(user);yml_file.append("\r\n");
 			}
 			break;
+		case "entrypoint":
+			if (entrypoint != null)
+			{
+				docker_run.append(" ");docker_run.append("--entrypoint");docker_run.append(" ");docker_run.append(entrypoint);docker_run.append(" ");
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("entrypoint:");yml_file.append(entrypoint);yml_file.append("\r\n");
+			}
+			break;
 		case "tty":
 			if (tty)
 			{
@@ -549,6 +556,7 @@ public class Convert {
 			writeRUNnYML("network");
 			writeRUNnYML("workdir");
 			writeRUNnYML("depends_on");
+			writeRUNnYML("entrypoint");
 			writeRUNnYML("hostname");			
 		}
 		finally
