@@ -527,7 +527,7 @@ public class Convert {
 			if (hostname != null)
 			{
 				docker_run.append(" ");docker_run.append("--hostname");docker_run.append(" ");docker_run.append(hostname);docker_run.append(" ");
-				yml_file.append(" ");yml_file.append(" ");yml_file.append("hostname:");yml_file.append(hostname);yml_file.append("\r\n");
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("hostname:");yml_file.append(" ");yml_file.append(hostname);yml_file.append("\r\n");
 			}
 			break;
 		}
