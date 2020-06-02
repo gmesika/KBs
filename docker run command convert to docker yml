@@ -472,7 +472,7 @@ public class Convert {
 			if (user != null)
 			{
 				docker_run.append(" ");docker_run.append("-u");docker_run.append(" ");docker_run.append(user);docker_run.append(" ");
-				yml_file.append(" ");yml_file.append(" ");yml_file.append("user:");yml_file.append(user);yml_file.append("\r\n");
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("user:");yml_file.append(" ");yml_file.append(user);yml_file.append("\r\n");
 			}
 			break;
 		case "entrypoint":
