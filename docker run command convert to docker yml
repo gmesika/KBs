@@ -33,6 +33,7 @@ public class Convert {
 	private static boolean deamon = false;
 	private static String hostname = null;
 	private static String entrypoint = null;
+	private static String gpus = null;
 	
 	private static StringBuffer yml_file = null;
 	private static StringBuffer docker_run = null;
@@ -132,6 +133,9 @@ public class Convert {
 		case "--entrypoint":
 			entrypoint = "";
 			return true;
+		case "--gpus":
+			gpus = "";
+			return true;			
 		default:
 			System.out.println("handling default");
 			if (! objName.startsWith("-") && imageName == null && matchesPossibleImageName(objName))
@@ -269,6 +273,13 @@ public class Convert {
 			if (b11)
 				entrypoint = val;
 			return b11;
+		case "--gpus":
+			Pattern p12 = Pattern.compile(".*");
+			Matcher m12 = p12.matcher(val);
+			boolean b12 = m12.matches();
+			if (b12)
+				gpus = val;
+			return b12;			
 		default:
 			if (runArgs != null)
 			{
@@ -530,6 +541,13 @@ public class Convert {
 				yml_file.append(" ");yml_file.append(" ");yml_file.append("hostname:");yml_file.append(" ");yml_file.append(hostname);yml_file.append("\r\n");
 			}
 			break;
+		case "gpus":
+			if (gpus != null)
+			{
+				docker_run.append(" ");docker_run.append("--gpus");docker_run.append(" ");docker_run.append(gpus);docker_run.append(" ");
+				//yml_file.append(" ");yml_file.append(" ");yml_file.append("hostname:");yml_file.append(" ");yml_file.append(hostname);yml_file.append("\r\n");
+			}
+			break;			
 		}
 	}
 
@@ -557,6 +575,7 @@ public class Convert {
 			writeRUNnYML("workdir");
 			writeRUNnYML("depends_on");
 			writeRUNnYML("entrypoint");
+			writeRUNnYML("gpus");
 			writeRUNnYML("hostname");			
 		}
 		finally
@@ -629,7 +648,7 @@ public class Convert {
 	
 	public static void main(String[] args) throws Exception 
 	{
-		System.out.println("version 0.9");
+		System.out.println("version 0.91");
 		parseArgs(args);
 		String sentence = organizeDockerRun(dockerArgs);
 		extractDockerObjects(sentence);
