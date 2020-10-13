@@ -34,6 +34,7 @@ public class Convert {
 	private static String hostname = null;
 	private static String entrypoint = null;
 	private static String gpus = null;
+	private static String runtime = null;
 	
 	private static StringBuffer yml_file = null;
 	private static StringBuffer docker_run = null;
@@ -135,7 +136,10 @@ public class Convert {
 			return true;
 		case "--gpus":
 			gpus = "";
-			return true;			
+			return true;
+		case "--runtime":
+			runtime = "";
+			return true;
 		default:
 			System.out.println("handling default");
 			if (! objName.startsWith("-") && imageName == null && matchesPossibleImageName(objName))
@@ -279,7 +283,14 @@ public class Convert {
 			boolean b12 = m12.matches();
 			if (b12)
 				gpus = val;
-			return b12;			
+			return b12;
+		case "--runtime":
+			Pattern p13 = Pattern.compile(".*");
+			Matcher m13 = p13.matcher(val);
+			boolean b13 = m13.matches();
+			if (b13)
+				runtime = val;
+			return b13;				
 		default:
 			if (runArgs != null)
 			{
@@ -547,7 +558,14 @@ public class Convert {
 				docker_run.append(" ");docker_run.append("--gpus");docker_run.append(" ");docker_run.append(gpus);docker_run.append(" ");
 				//yml_file.append(" ");yml_file.append(" ");yml_file.append("hostname:");yml_file.append(" ");yml_file.append(hostname);yml_file.append("\r\n");
 			}
-			break;			
+			break;		
+		case "runtime":
+			if (runtime != null)
+			{
+				docker_run.append(" ");docker_run.append("--runtime");docker_run.append(" ");docker_run.append(runtime);docker_run.append(" ");
+				yml_file.append(" ");yml_file.append(" ");yml_file.append("runtime:");yml_file.append(" ");yml_file.append(runtime);yml_file.append("\r\n");
+			}
+			break;				
 		}
 	}
 
@@ -576,6 +594,7 @@ public class Convert {
 			writeRUNnYML("depends_on");
 			writeRUNnYML("entrypoint");
 			writeRUNnYML("gpus");
+			writeRUNnYML("runtime");
 			writeRUNnYML("hostname");			
 		}
 		finally
