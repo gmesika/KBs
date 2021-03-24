@@ -1,0 +1,25 @@
+ssh -i ~/.ssh/test_rsa administrator@lisbon "cd /home/jenkins && curl -O http://london:8080/jnlpJars/slave.jar && java -jar slave.jar"
+
+ VM='mini-kube'
+ VBoxManage createhd --filename $VM.vdi --size 32768
+ VBoxManage createvm --name $VM --ostype "Ubuntu_64" --register
+ VBoxManage storagectl $VM --name "SATA Controller" --add sata  --controller IntelAHCI
+ VBoxManage storageattach $VM --storagectl "SATA Controller" --port 0  --device 0 --type hdd --medium $VM.vdi
+ VBoxManage storagectl $VM --name "IDE Controller" --add ide
+ VBoxManage storageattach $VM --storagectl "IDE Controller" --port 0 --device 0 --type dvddrive --medium /home/gmesika/ubuntu_iso/ubuntu-auto.iso
+ VBoxManage modifyvm $VM --ioapic on
+ VBoxManage modifyvm $VM --boot1 dvd --boot2 disk --boot3 none --boot4 none
+ VBoxManage modifyvm $VM --memory 2048 --vram 128
+ VBoxManage modifyvm $VM --nic1 bridged --bridgeadapter1 enp1s0f0
+ VBoxHeadless -s $VM
+
+ vboxmanage startvm $VM <<0--- to start with gui
+
+sudo apt install virtualbox-ext-pack
+
+
+VBoxManage unregistervm   $VM --delete
+
+192.168.32.184 - kmaster
+192.168.32.185 - kslave
+192.168.32.191 - mini-kube
