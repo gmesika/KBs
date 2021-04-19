@@ -1,0 +1,93 @@
+node ('jenkins-slave-1')
+{
+	
+	stage('init')
+	{
+		properties(
+			[disableConcurrentBuilds(), pipelineTriggers([pollSCM('H/15 * * * *')])]
+			)
+			sh label: '', script: 'set'
+	}
+
+	stage('Checkout')
+	{
+		def branch_name = env.BRANCH_NAME
+		git poll: true, branch: branch_name, url: 'git@bitbucket.org:gsitech/ledag-tools.git'
+	}
+
+	def map
+	def jobNumber
+	def jobName
+	def tag
+
+	stage('Setup details')
+	{
+		jobName = env.BRANCH_NAME 
+		jobNumber = env.BUILD_NUMBER 
+		jobName = jobName.toLowerCase()
+		workspace = env.WORKSPACE
+		tag = ":" + jobName + "." + jobNumber 	
+	}
+
+	def GSI_MANAGEMENT_VERSION
+	def PY_MANAGEMENT_VERSION
+
+	stage('read properties')
+	{
+		GSI_MANAGEMENT_VERSION = env.BRANCH_NAME.split( '_v' )[1]
+		RELEASE_ID = env.BRANCH_NAME.split( '_v' )[0]
+		RELEASE_ID = RELEASE_ID.split( 'dev-' )[1]
+		println "GSI_MANAGEMENT_VERSION:" + GSI_MANAGEMENT_VERSION
+		// hard-coded the 300 value just to get the PY that was built - it same repo anyway
+		PY_MANAGEMENT_VERSION = GSI_MANAGEMENT_VERSION.replace('.0.', '.300.')
+		PY_MANAGEMENT_VERSION = PY_MANAGEMENT_VERSION.replace('100.', '120.')
+	}
+
+
+	stage('Update Release and Build')
+	{	
+		sh "/efs/data/devops/apache-maven-3.6.1/bin/mvn -B release:update-versions -DdevelopmentVersion=Dev-"+GSI_MANAGEMENT_VERSION+"-SNAPSHOT -s /efs/data/devops/settings-all.xml"
+		//result = sh "./replace_version.sh " + RELEASE_VERSION
+		//println result
+	}
+	
+	stage('Build Release')
+	{		
+		//result = sh "/efs/data/devops/apache-maven-3.6.1/bin/mvn -B clean deploy -Dbuild.number="+RELEASE_VERSION+" -Dhost.name=london -s /efs/data/devops/settings-all.xml -U -Dgsi.management.version=Dev-"+PY_MANAGEMENT_VERSION+"-SNAPSHOT"
+		result = sh "/efs/data/devops/apache-maven-3.6.1/bin/mvn -B clean deploy -Dmanagement.version="+GSI_MANAGEMENT_VERSION+" -Drelease.version="+RELEASE_ID+" -Dbuild.number="+jobNumber+" -Dpom.version=Dev-"+GSI_MANAGEMENT_VERSION+"-SNAPSHOT -Dhost.name=london -s /efs/data/devops/settings-all.xml -U -Dgsi.management.version=Dev-"+PY_MANAGEMENT_VERSION+"-SNAPSHOT"
+		println result
+	}
+	
+	stage('Get Version Details')
+    	{
+        	data = readJSON file: workspace + "/ledag-server/target/version.json"
+                artifactVersion = data["artifactVersion"]
+	        projectVersion = data["projectVersion"]
+        	artifactTemplateURL = data["artifactTemplateURL"]
+	        releaseVersion = data["releaseVersion"]
+        	println("Artifact Version: " + artifactVersion)
+	        println("Project Version: " + projectVersion)
+        	println("Artifact Template URL: " + artifactTemplateURL)
+	        println("Release Version: " + releaseVersion)
+	}
+	
+	stage('replace_version')
+	{
+		result = sh "./replace_version.sh " + artifactVersion
+                println result
+	}
+
+
+	stage('Redeploy on CI/CD env')
+	{
+		build job: "GSI-Ledag-Tools-Deployment-AutomationEnv", wait: true, quietPeriod: 3
+		build job: "GSI-Installer-Deployment-AutomationEnv", wait: true, quietPeriod: 3
+	}
+
+	stage('Run catalog update build')
+        {
+		build job: 'GSI-Catalog-Update-Version-AutomationEnv', wait: true, quietPeriod: 3, parameters: [string(name: 'PRODUCT_POM_VERSION', value: projectVersion),
+                string(name: 'PRODUCT_RELEASE_VERSION', value: releaseVersion), string(name: 'PRODUCT_BUILD_VERSION', value: artifactVersion),
+                        string(name: 'PRODUCT_TEMPLATE_URL', value: artifactTemplateURL)]
+        }
+}
