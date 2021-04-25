@@ -1,0 +1,325 @@
+
+def run_orion_tools_build()
+{
+	build job: "GSI-Ledag-Tools-Builds/" +env.BRANCH_NAME.replace("/","%2F"), wait: false
+}
+
+def run_catalog_update_build(VERSION, wnc_version, PRODUCT_TEMPLATE_URL)
+{
+
+	def PRODUCT_POM_VERSION = "Dev-"+VERSION+"-SNAPSHOT"
+	def PRODUCT_BUILD_VERSION = wnc_version
+
+	build job: 'GSI-Catalog-Update-Version-AutomationEnv', wait: false, parameters: [string(name: 'PRODUCT_POM_VERSION', value: PRODUCT_POM_VERSION), 
+		string(name: 'PRODUCT_RELEASE_VERSION', value: VERSION), string(name: 'PRODUCT_BUILD_VERSION', value: PRODUCT_BUILD_VERSION), 
+			string(name: 'PRODUCT_TEMPLATE_URL', value: PRODUCT_TEMPLATE_URL)]
+}
+
+// *** moved automation into pom.xml ***
+// def run_automation()
+// {
+// 	DEPLOYMENT_SUCCESS = ""
+// 	stage('Deployment to AutomationEnv')
+// 	{
+// 		try
+// 		{
+// 			build 'GSI-Device-Infra-Deployment-AutomationEnv'
+// 			DEPLOYMENT_SUCCESS = "true"
+// 		}
+// 		catch (Exception e)
+// 		{
+// 			DEPLOYMENT_SUCCESS = "false"
+// 		}
+// 	}
+//
+// 	if (DEPLOYMENT_SUCCESS == "true")
+// 	{
+// 		def DEVDIAG_SUCCESS = ""
+// 		stage('DevDiag in AutomationEnv')
+// 		{
+// 			try
+// 			{
+// 				build 'GSI-Device-Infra-Dev-Diag-AutomationEnv'
+// 				DEVDIAG_SUCCESS = "true"
+// 			}
+// 			catch (Exception e)
+// 			{
+// 				DEVDIAG_SUCCESS = "false"
+// 			}
+// 		}
+//
+// 		if (DEVDIAG_SUCCESS == "true")
+// 		{
+// 			stage('HwTests to AutomationEnv')
+// 			{
+// 				try
+// 				{
+// 					build 'GSI-Device-Infra-HW-Tests-AutomationEnv'
+// 				}
+// 				catch (Exception e)
+// 				{
+// 					println "hw-tests failed..."
+// 				}
+// 			}
+// 		}
+// 		else
+// 			println "devdiag failed... so dont run hw-tests"
+// 	}
+// 	else
+// 		println "deployment failed... so dont run dia and hw-tests"
+//
+// }
+
+def gitreset()
+{
+	stage('Git reset')
+	{
+	      sh "git reset --hard"
+	}
+}
+
+def buildVersion(VERSION, wnc_version, IMAGE_UB_PATH, BOOT_BIN_PATH, KO_FILE_PATH, TYPE, DEVELOPMENT, IS_FOR_LEDA_E)
+{
+	if (DEVELOPMENT == "false")
+	{
+		stage('Update Release Version ' + VERSION)
+		{
+		      sh "/efs/data/devops/apache-maven-3.6.1/bin/mvn -B release:update-versions -DdevelopmentVersion=Dev-"+VERSION+"-SNAPSHOT -s /efs/data/devops/settings-all.xml"
+		}
+	}
+	else
+	{
+		println "Not running update versions since it is development version, keeping version is DEV-1000-SNAPSHOT..."
+	}
+
+	stage('Build ' + VERSION)
+	{
+	    println "IS_FOR_LEDA_E: " + IS_FOR_LEDA_E
+	    if (IS_FOR_LEDA_E == "false")
+	    {
+	      sh "/efs/data/devops/apache-maven-3.6.1/bin/mvn -B clean deploy  -U -Dwnc.version="+wnc_version+" -Dwnc.image.ub.path="+IMAGE_UB_PATH+" -Dwnc.boot.bin.path="+BOOT_BIN_PATH+" -Dwnc.ko.file.path="+KO_FILE_PATH+" -Dwnc.type="+TYPE+" -Dartifact.release.version="+VERSION+" -Ddevelopment.status="+DEVELOPMENT+" -s /efs/data/devops/settings-all.xml"
+	    }
+	    else
+	    {
+	        println "Not running ci-cd-automation - version is for Leda-E"
+	        sh "/efs/data/devops/apache-maven-3.6.1/bin/mvn -B clean deploy  -U -P!run-ci-cd-automation -Dwnc.version="+wnc_version+" -Dwnc.image.ub.path="+IMAGE_UB_PATH+" -Dwnc.boot.bin.path="+BOOT_BIN_PATH+" -Dwnc.ko.file.path="+KO_FILE_PATH+" -Dwnc.type="+TYPE+" -Dartifact.release.version="+VERSION+" -Ddevelopment.status="+DEVELOPMENT+" -s /efs/data/devops/settings-all.xml"
+	    }
+	}
+}
+
+def readProperties(release_file_name, FOUND_DEV_TRUE, jobName, jobNumber, tag)
+{
+    def RELEASE_ID = ""
+	def VERSION = ""
+	def IMAGE_UB_PATH = ""
+	def BOOT_BIN_PATH = ""
+	def KO_FILE_PATH = ""
+	def TYPE = ""
+	def ENABLED = ""
+	def DEVELOPMENT = ""
+	def FOR_LEDA_E = ""
+	def SAVED_FILE_NAME = ""
+	def PRODUCT_TEMPLATE_URL = ""
+
+    def release_properties = readFile release_file_name
+    println release_properties
+    def properties = release_properties.split("\n")
+    for (property in properties)
+    {
+        println "property:" + property
+        def key = property.split("=")[0]
+        //def value = property.split("=")[1]
+        if (key == "enabled")
+            ENABLED=property.split("=")[1]
+        //if (key == "version")
+        //	VERSION=value
+        if (ENABLED == "true")
+            value = property.split("=")[1]
+        if (ENABLED == "true" && key == "release")
+            RELEASE_ID=value
+        if (ENABLED == "true" && key == "image.ub.path")
+            IMAGE_UB_PATH=value
+        if (ENABLED == "true" && key == "boot.bin.path")
+            BOOT_BIN_PATH=value
+        if (ENABLED == "true" && key == "ko.file.path")
+            KO_FILE_PATH=value
+        if (ENABLED == "true" && key == "type")
+            TYPE=value
+        if (ENABLED == "true" && key == "development")
+            DEVELOPMENT=value
+        if (ENABLED == "true" && key == "for_leda_e")
+            FOR_LEDA_E = value
+
+            // check if version is for development and prepare to send DEVELOPMENT once with false and once with true
+        if (DEVELOPMENT == "true")
+        {
+            if (FOUND_DEV_TRUE == "false")
+            {
+                SAVED_FILE_NAME = release_file_name
+                FOUND_DEV_TRUE = "true"
+                DEVELOPMENT = "false"
+            }
+        }
+        println "key:" + key
+        println "value:" + value
+    }
+
+    if (ENABLED == "true")
+    {
+        println ("release_file_name:"+release_file_name)
+        def file_split_size = release_file_name.toString().split("/").size()
+        println ("release_file_name size:"+file_split_size)
+        only_file_name = release_file_name.toString().split("/")[file_split_size-1]
+        println only_file_name.toString().split("\\.").size()
+        file_split_size = only_file_name.toString().split("\\.").size()
+        def version_A = only_file_name.split("\\.")[file_split_size-3]
+        println ("version_A:"+version_A)
+        def version_B = jobName.split("_v")[1].split("\\.")[1]
+        println ("version_B:"+version_B)
+        def version_C = only_file_name.split("\\.")[file_split_size-2]
+        println ("version_C:"+version_C)
+        def version_D = jobName.split("_v")[1].split("\\.")[3]
+        println ("version_D:"+version_D)
+
+        VERSION     = version_A + "." + version_B + "." + version_C + "." + version_D
+        DEV_VERSION = "100." + version_B + "." + version_C + "." + version_D
+
+        def wnc_version_param_value = VERSION //#resolver.resolve( "wnc.version")
+        def release_id_version = RELEASE_ID // #resolver.resolve( "RELEASE_ID")
+
+        wnc_version = wnc_version_param_value  + "." + release_id_version + "." + jobNumber
+        map = ["BUILD_TAG": tag, "BUILD_NUM":jobNumber, "JOB_NAME":jobName, "WNC_VERSION":wnc_version]
+        if (DEVELOPMENT == "true")
+        {
+            println "dev version " + DEV_VERSION + " is enabled for build....."
+            println "FOR_LEDA_E: " + FOR_LEDA_E
+            buildVersion(DEV_VERSION, map['WNC_VERSION'], IMAGE_UB_PATH, BOOT_BIN_PATH, KO_FILE_PATH, TYPE, "true", FOR_LEDA_E)
+
+            gitreset()
+        }
+        else
+        {
+            println "version " + VERSION + " is enabled for build....."
+            println "FOR_LEDA_E: " + FOR_LEDA_E
+            buildVersion(VERSION, map['WNC_VERSION'], IMAGE_UB_PATH, BOOT_BIN_PATH, KO_FILE_PATH, TYPE, "false", FOR_LEDA_E)
+
+            gitreset()
+
+            PRODUCT_TEMPLATE_URL = get_template_url()
+            println "PRODUCT_TEMPLATE_URL: " + PRODUCT_TEMPLATE_URL
+            run_catalog_update_build(VERSION, map['WNC_VERSION'], PRODUCT_TEMPLATE_URL)
+        }
+    }
+    else
+    {
+        println "version " + VERSION + " is not enabled for build....."
+    }
+	return [SAVED_FILE_NAME, FOUND_DEV_TRUE]
+}
+
+def getfiles(workers_dir)
+{
+	def FILES_LIST
+	try
+	{
+		FILES_LIST = sh (script: "ls   " + env.WORKSPACE +'/' + workers_dir, returnStdout: true).trim()
+	}
+	catch (Exception e)
+	{
+		FILES_LIST = ""
+	}
+	return FILES_LIST
+}
+
+
+def get_template_url()
+{
+    data = readJSON file: workspace + "/products/wnc/target/version.json"
+        artifactTemplateURL = data["artifactTemplateURL"]
+        artifactTemplateURL = artifactTemplateURL.replace("%26", "&")
+        println("Artifact Template URL: " + artifactTemplateURL)
+    return artifactTemplateURL
+}
+
+node ('netivot')
+{
+	
+	stage('init')
+	{
+	properties(
+		[ disableConcurrentBuilds(), [$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: false], pipelineTriggers([pollSCM('H/15 * * * * ')])]
+		)
+		sh label: '', script: 'set'
+	}
+	stage('Checkout')
+	{
+		def branch_name = env.BRANCH_NAME
+		git poll: true, branch: branch_name, url: 'git@bitbucket.org:gsitech/sys-apu.git'
+	}
+	def map
+	def jobNumber
+	def jobName
+	def tag
+	stage('Setup details')
+	{
+		jobName = env.BRANCH_NAME //#Thread.currentThread().getCurrentExecutable().getProject().getDisplayName()
+		jobNumber = env.BUILD_NUMBER //#Thread.currentThread().getCurrentExecutable().getNumber()
+		jobName = jobName.toLowerCase()
+		tag = ":" + jobName + "." + jobNumber 	
+	}
+
+	def FOUND_DEV = "false"
+	def SAVED_FILE_FOR_DEV = ""
+	stage('read properties')
+	{
+		try
+		{
+			FILES_LIST=getfiles("release.*.properties")
+			//DEBUG
+			println "FILES_LIST: " + FILES_LIST
+			//PARSING
+			if (FILES_LIST == "")
+			{
+				println "no properties file found..."
+				throw new Exception("no properties file found...")
+			}
+			for(String ele : FILES_LIST.split("\\r?\\n"))
+			{
+				release_file_name = "${ele}"
+				println "properties file name: " + release_file_name
+				(FILE_NAME, FOUND_DEV) = readProperties(release_file_name, FOUND_DEV, jobName, jobNumber, tag)
+				println "FILE_NAME: " + FILE_NAME
+				println "FOUND_DEV: " + FOUND_DEV
+				if (FOUND_DEV == "true")
+				{
+				    SAVED_FILE_FOR_DEV = FILE_NAME
+				    println "Version for Development: " + SAVED_FILE_FOR_DEV
+				    FOUND_DEV = "false"
+				}
+            }
+
+			if (SAVED_FILE_FOR_DEV != "")
+			{
+			    readProperties(SAVED_FILE_FOR_DEV, "true", jobName, jobNumber, tag)
+			}
+			else
+			{
+			    println "No version found for development; SAVED_FILE_FOR_DEV: " + SAVED_FILE_FOR_DEV
+			}
+
+			run_orion_tools_build()			
+		}
+		catch (Exception e) 
+		{
+			currentBuild.result = 'FAILURE'
+			println e.toString()
+			println e.getMessage()
+			// emailext body: 'A Test EMail', recipientProviders: [[$class: 'DevelopersRecipientProvider'], [$class: 'RequesterRecipientProvider']], subject: 'Test'
+			emailext attachLog: true, body: '$DEFAULT_CONTENT', recipientProviders: [developers(), requestor()], subject: '$DEFAULT_SUBJECT', to: 'systemteam@gsitechnology.com'
+		}
+		finally
+		{
+			println "pipeline finished"
+		}
+	}
+}
