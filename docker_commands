@@ -1,0 +1,26 @@
+docker image ls | grep system-api | awk '{print $3}'
+docker image rm $( docker image ls | grep "smart-api" | awk '{print $3}' )
+
+
+
+
+docker image ls --filter reference=bergen-vm:5005/com/gsi/apu/smart-api/*
+
+docker image rm -f $( docker image ls --filter reference=bergen-vm:5005/com/gsi/apu/smart-api/* -aq  )
+
+docker image ls --filter reference=bergen-vm:5005/com/gsi/apu/smart-api/* | awk '{$0=tolower($0);$1=$1}1' | cut -d' ' -f1,2 | sed 's/ /\:/'
+
+docker image ls --filter reference=512138428247.dkr.ecr.eu-west-1.amazonaws.com/com/gsi/apu/smart-api/* | awk '{$0=tolower($0);$1=$1}1' | cut -d' ' -f1,2 | sed 's/ /\:/'
+
+
+docker image rm $( docker image ls --filter reference=com/gsi/apu/smart-api/* | awk '{$0=tolower($0);$1=$1}1' | cut -d' ' -f1,2 | sed 's/ /\:/' | grep -v ":latest" )
+
+docker image rm -f $( docker image ls --filter reference=cancun-vm:8123/com/gsi/apu/smart-api/* | grep -v latest | awk '{$0=tolower($0);$1=$1}1' | cut -d' ' -f1,2 | sed 's/ /\:/' )
+
+docker image rm -f $( docker image ls --filter reference=com/gsi/apu/smart-api/* | grep -v latest | awk '{$0=tolower($0);$1=$1}1' | cut -d' ' -f1,2 | sed 's/ /\:/' )
+
+docker image rm -f $( docker image ls --filter reference=cancun-vm:8123/gsi-backup/* | grep -v latest | awk '{$0=tolower($0);$1=$1}1' | cut -d' ' -f1,2 | sed 's/ /\:/' )
+
+docker image rm -f $( docker image ls --filter reference=512138428247.dkr.ecr.eu-west-1.amazonaws.com/webratio/nodejs-http-server/* | grep -v latest | awk '{$0=tolower($0);$1=$1}1' | cut -d' ' -f1,2 | sed 's/ /\:/' )
+
+docker image rm -f $( docker image ls --filter reference=512138428247.dkr.ecr.eu-west-1.amazonaws.com/com/gsi/apu/smart-api/* | grep -v latest | awk '{$0=tolower($0);$1=$1}1' | cut -d' ' -f1,2 | sed 's/ /\:/' )
